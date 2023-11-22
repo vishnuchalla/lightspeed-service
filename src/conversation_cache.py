@@ -11,7 +11,6 @@ class LRUCache:
         self.cache = OrderedDict()
         self.max_size = max_size
 
-
     # Get the value from the cache.
     # Returns the value if the key exists, empty string if not
     def get(self, key):
@@ -24,10 +23,10 @@ class LRUCache:
 
     # Adds a new key-value pair to the cache.  If the key already exists the new value will be appended to the existing value
     def upsert(self, key, value):
-        oldVal=self.get(key)
+        oldVal = self.get(key)
         if oldVal:
             # TODO limit length of cached value
-            self.cache[key]=oldVal+"\n"+value
+            self.cache[key] = oldVal + "\n" + value
         else:
             # Make room for a new entry if needed
             if len(self.cache) >= self.max_size:

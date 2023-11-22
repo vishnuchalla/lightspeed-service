@@ -7,10 +7,10 @@ from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
 
 # internal modules
-from modules.model_context import get_watsonx_predictor
-from modules.yes_no_classifier import YesNoClassifier
-from modules.task_performer import TaskPerformer
-from modules.task_rephraser import TaskRephraser
+from src.model_context import get_watsonx_predictor
+from src.yes_no_classifier import YesNoClassifier
+from src.task_performer import TaskPerformer
+from src.task_rephraser import TaskRephraser
 
 # internal tools
 from tools.ols_logger import OLSLogger
@@ -39,11 +39,7 @@ class TaskProcessor:
             verbose = False
 
         settings_string = f"conversation: {conversation}, tasklist: {tasklist}, query: {original_query},model: {model}, verbose: {verbose}"
-        self.logger.info(
-            conversation
-            + " call settings: "
-            + settings_string
-        )
+        self.logger.info(conversation + " call settings: " + settings_string)
 
         prompt_instructions = PromptTemplate.from_template(
             """

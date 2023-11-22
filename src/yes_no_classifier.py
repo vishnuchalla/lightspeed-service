@@ -7,7 +7,7 @@ from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
 
 # internal modules
-from modules.model_context import get_watsonx_predictor
+from src.model_context import get_watsonx_predictor
 
 # internal tools
 from tools.ols_logger import OLSLogger
@@ -15,6 +15,7 @@ from tools.ols_logger import OLSLogger
 load_dotenv()
 
 DEFAULT_MODEL = os.getenv("YESNO_MODEL", "ibm/granite-13b-chat-v1")
+
 
 class YesNoClassifier:
     def __init__(self):
@@ -35,11 +36,7 @@ class YesNoClassifier:
             verbose = False
 
         settings_string = f"conversation: {conversation}, query: {string},model: {model}, verbose: {verbose}"
-        self.logger.info(
-            conversation
-            + " call settings: "
-            + settings_string
-        )
+        self.logger.info(conversation + " call settings: " + settings_string)
 
         prompt_instructions = PromptTemplate.from_template(
             """Instructions:
@@ -69,7 +66,6 @@ class YesNoClassifier:
 
         self.logger.info(conversation + " yes/no query: " + query)
         self.logger.info(conversation + " using model: " + model)
-
 
         bare_llm = get_watsonx_predictor(model=model)
         llm_chain = LLMChain(llm=bare_llm, prompt=prompt_instructions, verbose=verbose)

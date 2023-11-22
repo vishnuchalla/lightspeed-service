@@ -19,7 +19,11 @@ def get_watsonx_predictor(model, min_new_tokens=1, max_new_tokens=256, **kwargs)
     api_url = os.getenv("BAM_URL", None)
     creds = Credentials(api_key, api_endpoint=api_url)
 
-    params = GenerateParams(decoding_method="greedy", min_new_tokens=min_new_tokens, max_new_tokens=max_new_tokens)
+    params = GenerateParams(
+        decoding_method="greedy",
+        min_new_tokens=min_new_tokens,
+        max_new_tokens=max_new_tokens,
+    )
 
     predictor = LangChainInterface(
         model=model, params=params, credentials=creds, verbose=verbose
@@ -27,9 +31,8 @@ def get_watsonx_predictor(model, min_new_tokens=1, max_new_tokens=256, **kwargs)
     return predictor
 
 
-def get_watsonx_context(model, url='local', tei_embedding_model = None, **kwargs):
-
-    if url != 'local':
+def get_watsonx_context(model, url="local", tei_embedding_model=None, **kwargs):
+    if url != "local":
         # MUST set tei_embedding_model to do this
         # TODO: make this appropriately blow up
         embed_model = TextEmbeddingsInference(

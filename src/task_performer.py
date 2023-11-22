@@ -28,13 +28,8 @@ class TaskPerformer:
         else:
             verbose = False
 
-
         settings_string = f"conversation: {conversation}, task: {task},model: {model}, verbose: {verbose}"
-        self.logger.info(
-            conversation
-            + " call settings: "
-            + settings_string
-        )
+        self.logger.info(conversation + " call settings: " + settings_string)
 
         # determine if this should go to a general LLM, the YAML generator, or elsewhere
 

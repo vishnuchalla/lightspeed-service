@@ -7,7 +7,7 @@ from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
 
 # internal modules
-from modules.model_context import get_watsonx_predictor
+from src.model_context import get_watsonx_predictor
 
 # internal tools
 from tools.ols_logger import OLSLogger
@@ -37,11 +37,7 @@ class TaskRephraser:
             verbose = False
 
         settings_string = f"conversation: {conversation}, query: {original_query},model: {model}, verbose: {verbose}"
-        self.logger.info(
-            conversation
-            + " call settings: "
-            + settings_string
-        )
+        self.logger.info(conversation + " call settings: " + settings_string)
 
         prompt_instructions = PromptTemplate.from_template(
             """
@@ -74,7 +70,8 @@ Response:
         response = llm_chain(inputs={"task": task, "query": original_query})
 
         self.logger.info(conversation + " response: " + str(response))
-        return response['text']
+        return response["text"]
+
 
 if __name__ == "__main__":
     """to execute, from the repo root, use python -m modules.task_rephraser.py"""

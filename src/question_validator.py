@@ -7,7 +7,7 @@ from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
 
 # internal modules
-from modules.model_context import get_watsonx_predictor
+from src.model_context import get_watsonx_predictor
 
 # internal tools
 from tools.ols_logger import OLSLogger
@@ -15,7 +15,10 @@ from tools.ols_logger import OLSLogger
 
 load_dotenv()
 
-DEFAULT_MODEL = os.getenv("QUESTION_VALIDATOR_MODEL", "ibm/granite-20b-code-instruct-v1")
+DEFAULT_MODEL = os.getenv(
+    "QUESTION_VALIDATOR_MODEL", "ibm/granite-20b-code-instruct-v1"
+)
+
 
 class QuestionValidator:
     def __init__(self):
@@ -36,11 +39,7 @@ class QuestionValidator:
             verbose = False
 
         settings_string = f"conversation: {conversation}, query: {query},model: {model}, verbose: {verbose}"
-        self.logger.info(
-            conversation
-            + " call settings: "
-            + settings_string
-        )
+        self.logger.info(conversation + " call settings: " + settings_string)
 
         prompt_instructions = PromptTemplate.from_template(
             """
@@ -84,7 +83,9 @@ Response:
         self.logger.info(conversation + " Validating query")
         self.logger.info(conversation + " using model: " + model)
 
-        bare_llm = get_watsonx_predictor(model=model, min_new_tokens=1, max_new_tokens=4)
+        bare_llm = get_watsonx_predictor(
+            model=model, min_new_tokens=1, max_new_tokens=4
+        )
         llm_chain = LLMChain(llm=bare_llm, prompt=prompt_instructions, verbose=verbose)
 
         task_query = prompt_instructions.format(query=query)
@@ -92,7 +93,7 @@ Response:
         self.logger.info(conversation + " task query: " + task_query)
 
         response = llm_chain(inputs={"query": query})
-        clean_response = str(response['text']).strip()
+        clean_response = str(response["text"]).strip()
 
         self.logger.info(conversation + " response: " + clean_response)
 
@@ -101,6 +102,7 @@ Response:
         # [VALID,NOYAML]
         # [VALID,YAML]
         return clean_response.split(",")
+
 
 if __name__ == "__main__":
     """to execute, from the repo root, use python -m modules.question_validator.py"""
@@ -142,4 +144,3 @@ if __name__ == "__main__":
         model=args.model,
         verbose=args.verbose,
     )
-

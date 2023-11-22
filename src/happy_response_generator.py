@@ -7,7 +7,7 @@ from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
 
 # internal modules
-from modules.model_context import get_watsonx_predictor
+from src.model_context import get_watsonx_predictor
 
 # internal tools
 from tools.ols_logger import OLSLogger
@@ -36,11 +36,7 @@ class HappyResponseGenerator:
             verbose = False
 
         settings_string = f"conversation: {conversation}, query: {string},model: {model}, verbose: {verbose}"
-        self.logger.info(
-            conversation
-            + " call settings: "
-            + settings_string
-        )
+        self.logger.info(conversation + " call settings: " + settings_string)
 
         prompt_instructions = PromptTemplate.from_template(
             """Instructions:
@@ -70,22 +66,23 @@ Response:
 
         self.logger.info(conversation + " full prompt: " + query)
 
-
         bare_llm = get_watsonx_predictor(model=model, temperature=2)
         llm_chain = LLMChain(llm=bare_llm, prompt=prompt_instructions, verbose=verbose)
 
         response = llm_chain(inputs={"question": string})
 
-        self.logger.info(conversation + " happy response: " + str(response['text']))
+        self.logger.info(conversation + " happy response: " + str(response["text"]))
 
-        return str(response['text'])
+        return str(response["text"])
 
 
 if __name__ == "__main__":
     """to execute, from the repo root, use python -m modules.happy_response_generator"""
     import argparse
 
-    parser = argparse.ArgumentParser(description="Generate a pleasant prefix for the response to the user")
+    parser = argparse.ArgumentParser(
+        description="Generate a pleasant prefix for the response to the user"
+    )
     parser.add_argument(
         "-c",
         "--conversation-id",
@@ -116,4 +113,3 @@ if __name__ == "__main__":
     happy_response_generator.generate(
         args.conversation_id, args.query, model=args.model, verbose=args.verbose
     )
-

@@ -12,4 +12,4 @@ images:
 	scripts/build-container.sh
 
 run:
-	uvicorn ols:app --reload --port 8080
+	uvicorn app.main:app --reload --port 8080
