@@ -15,7 +15,7 @@ from modules.yaml_generator import YamlGenerator
 from modules.happy_response_generator import HappyResponseGenerator
 from modules.docs_summarizer import DocsSummarizer
 from modules.model_context import get_watsonx_predictor
-from modules.conversation_cache import LRUCache
+from modules.conversation_cache import RedisCache
 from modules.gradio_ui import ui
 
 # internal tools
@@ -38,7 +38,7 @@ class FeedbackRequest(BaseModel):
     feedback_object: str # a json blob 
 
 
-conversation_cache=LRUCache(100)
+conversation_cache = RedisCache(maxmemory="500mb", maxmemory_policy="allkeys-lfu")
 app = FastAPI()
 gr.mount_gradio_app(app,ui,path="/ui")
 
@@ -126,7 +126,8 @@ def ols_request(llm_request: LLMRequest):
             # RAG for supporting documentation
 
             llm_response.response = wrapper + "\n" + generated_yaml
-            conversation_cache.upsert(conversation,llm_request.query+"\n\n"+llm_response.response)
+            conversation_cache.put(conversation,llm_request.query+"\n\n"+llm_response.response)
+            conversation_cache.stats()
             return llm_response
 
         else:

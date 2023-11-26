@@ -1,38 +1,57 @@
-from collections import OrderedDict
+import redis
+import threading
+from tools.ols_logger import OLSLogger
 
+class RedisCache:
+    _instance = None
+    _lock = threading.Lock()
+    logger = None
 
-# TODO
-# this is not thread safe
-# this does not scale
-# this does not work in a distributed system
-# this is a placeholder to be replaced with something like memcached
-class LRUCache:
-    def __init__(self, max_size):
-        self.cache = OrderedDict()
-        self.max_size = max_size
+    def __new__(cls, *args, **kwargs):
+        with cls._lock:
+            if not cls._instance:
+                cls._instance = super(RedisCache, cls).__new__(cls)
+                # Initialize Redis client and logger
+                cls._instance.initialize_redis(args, kwargs)
+        return cls._instance
 
+    def initialize_redis(self, *args, **kwargs):
+        """Initialize the Redis client and logger."""
+        self.redis_client = redis.StrictRedis(
+            host="redis-stack.ols.svc",
+            port=6379,
+            decode_responses=True,
+        )
+        # Set custom configuration parameters
+        maxmemory = kwargs.get("maxmemory", "500mb")
+        maxmemory_policy = kwargs.get("maxmemory_policy", "allkeys-lfu")
+        self.redis_client.config_set("maxmemory", maxmemory)
+        self.redis_client.config_set("maxmemory-policy", maxmemory_policy)
 
-    # Get the value from the cache.
-    # Returns the value if the key exists, empty string if not
+        # Configure the logger for the class
+        self.logger = OLSLogger("conversational_cache").logger
+
     def get(self, key):
-        if key in self.cache:
-            # Move the accessed key to the end to mark it as most recently used
-            self.cache.move_to_end(key)
-            return self.cache[key]
-        else:
-            return ""
+        """Get the value associated with the given key."""
+        return self.redis_client.get(key)
 
-    # Adds a new key-value pair to the cache.  If the key already exists the new value will be appended to the existing value
-    def upsert(self, key, value):
-        oldVal=self.get(key)
-        if oldVal:
-            # TODO limit length of cached value
-            self.cache[key]=oldVal+"\n"+value
-        else:
-            # Make room for a new entry if needed
-            if len(self.cache) >= self.max_size:
-                # Remove the oldest entry if the cache is full
-                self.cache.popitem(last=False)
-            self.cache[key] = value
-        # mark the entry as recently used
-        self.cache.move_to_end(key)
+    def put(self, key, value):
+        """Set the value associated with the given key."""
+        oldValue = self.get(key)
+        with self._lock:
+            if oldValue:
+                self.redis_client.set(key, oldValue+"\n"+value)
+            else:
+                self.redis_client.set(key, value)
+    
+    def stats(self):
+        # TODO To publish these metrics to our monitoring stack
+        """Get stats on cache performance"""
+        info_output = self.redis_client.info()
+        # Extract relevant metrics
+        hits = info_output['keyspace_hits']
+        misses = info_output['keyspace_misses']
+
+        # Use the logger to output metrics
+        self.logger.info(f"Cache Hits: {hits}")
+        self.logger.info(f"Cache Misses: {misses}")

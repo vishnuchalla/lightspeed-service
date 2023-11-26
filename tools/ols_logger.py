@@ -20,11 +20,6 @@ class OLSLogger:
         # standardize log format
         formatter = logging.Formatter("%(asctime)s [%(filename)s:%(lineno)d] %(levelname)s: %(message)s")
 
-        # log to files
-        file_handler = logging.handlers.RotatingFileHandler("logs/ols.log", maxBytes=(1048576*100), backupCount=7)
-        file_handler.setFormatter(formatter)
-        self.logger.addHandler(file_handler)
-
         # also log to stdout
 
         stdoutHandler=logging.StreamHandler(sys.stdout)
