@@ -6,7 +6,7 @@ metadata:
 spec:
   to:
     kind: Service
-    name: redis-stack
+    name: redis-master
   port:
     targetPort: 8001
   wildcardPolicy: None
@@ -14,11 +14,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: redis-stack
+  name: redis-master
   namespace: ols
 spec:
   selector:
-    app: redis
+    app: "redis-master"
   ports:
     - name: redis-server
       protocol: TCP
@@ -32,21 +32,165 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: redis-stack
+  labels:
+    redis-sentinel: "true"
+    role: master
+    app: "redis-master"
+  name: "redis-master"
   namespace: ols
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: redis
+      app: "redis-master"
   template:
     metadata:
       labels:
-        app: redis
+        app: "redis-master"
+        redis-sentinel: "true"
     spec:
       containers:
-      - name: redis
-        image: quay.io/vchalla/redis-stack:latest
-        ports:
-        - containerPort: 6379
-        - containerPort: 8001
+        - name: master
+          image: quay.io/vchalla/redis-master:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 6379
+              protocol: TCP
+            - containerPort: 8001
+              protocol: TCP
+          env:
+            - name: MASTER
+              value: "true"
+          resources:
+            limits:
+              memory: "1Gi"
+          terminationMessagePath: /dev/termination-log
+          volumeMounts:
+            - mountPath: /redis-master-data
+              name: data
+        - name: sentinel
+          image: quay.io/vchalla/redis-slave:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 26379
+              protocol: TCP
+          env:
+            - name: SENTINEL
+              value: "true"
+            - name: REDIS_SENTINEL_SERVICE_HOST
+              value: "redis-sentinel.ols.svc"
+            - name: REDIS_SENTINEL_SERVICE_PORT
+              value: "26379"
+          resources:
+            limits:
+              memory: "1Gi"
+          terminationMessagePath: /dev/termination-log
+          volumeMounts:
+            - mountPath: /redis-sentinel-data
+              name: data-sentinel
+      volumes:
+        - name: data
+          emptyDir: {}
+        - name: data-sentinel
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: "redis-sentinel"
+    name: sentinel
+    role: service
+  name: "redis-sentinel"
+  namespace: ols
+spec:
+  ports:
+    - port: 26379
+      targetPort: 26379
+  selector:
+    redis-sentinel: "true"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: "redis"
+  name: "redis"
+  namespace: ols
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: "redis"
+  template:
+    metadata:
+      labels:
+        app: "redis"
+    spec:
+      containers:
+        - name: redis
+          image: quay.io/vchalla/redis-slave:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 6379
+              protocol: TCP
+          env:
+            - name: REDIS_SENTINEL_SERVICE_HOST
+              value: "redis-sentinel.ols.svc"
+            - name: REDIS_SENTINEL_SERVICE_PORT
+              value: "26379"
+          resources:
+            limits:
+              memory: "1Gi"
+          terminationMessagePath: /dev/termination-log
+          volumeMounts:
+            - mountPath: /redis-master-data
+              name: data
+      volumes:
+        - name: data
+          emptyDir: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "redis-sentinel"
+  namespace: ols
+  labels:
+    app: "redis-sentinel"
+    redis-sentinel: "true"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      redis-sentinel: "true"
+  template:
+    metadata:
+      labels:
+        app: "redis-sentinel"
+        redis-sentinel: "true"
+        role: sentinel
+    spec:
+      containers:
+        - name: sentinel
+          image: quay.io/vchalla/redis-slave:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 26379
+              protocol: TCP
+          env:
+            - name: SENTINEL
+              value: "true"
+            - name: REDIS_SENTINEL_SERVICE_HOST
+              value: "redis-sentinel.ols.svc"
+            - name: REDIS_SENTINEL_SERVICE_PORT
+              value: "26379"
+          resources:
+            limits:
+              memory: "1Gi"
+          terminationMessagePath: /dev/termination-log
+          volumeMounts:
+            - mountPath: /redis-master-data
+              name: data
+      volumes:
+        - name: data
+          emptyDir: {}

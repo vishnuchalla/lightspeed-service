@@ -18,7 +18,7 @@ class RedisCache:
     def initialize_redis(self, *args, **kwargs):
         """Initialize the Redis client and logger."""
         self.redis_client = redis.StrictRedis(
-            host="redis-stack.ols.svc",
+            host="redis-master.ols.svc",
             port=6379,
             decode_responses=True,
         )
