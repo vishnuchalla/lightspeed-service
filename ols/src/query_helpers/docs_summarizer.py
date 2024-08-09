@@ -1,6 +1,7 @@
 """A class for summarizing documentation context."""
 
 import logging
+import pyroscope
 from typing import Any, Optional
 
 from langchain.chains import LLMChain
@@ -58,97 +59,98 @@ class DocsSummarizer(QueryHelper):
         Returns:
             A `SummarizerResponse` object.
         """
-        # if history is not provided, initialize to empty history
-        if history is None:
-            history = []
+        with pyroscope.tag_wrapper({ "docs_summarizer": "summarize" }):
+            # if history is not provided, initialize to empty history
+            if history is None:
+                history = []
 
-        verbose = kwargs.get("verbose", "").lower() == "true"
-        settings_string = (
-            f"conversation_id: {conversation_id}, "
-            f"query: {query}, "
-            f"provider: {self.provider}, "
-            f"model: {self.model}, "
-            f"verbose: {verbose}"
-        )
-        logger.debug(f"{conversation_id} call settings: {settings_string}")
-
-        token_handler = TokenHandler()
-        bare_llm = self.llm_loader(self.provider, self.model, self.generic_llm_params)
-        provider_config = config.llm_config.providers.get(self.provider)
-        model_config = provider_config.models.get(self.model)
-        model_options = self._get_model_options(provider_config)
-
-        # Use sample text for context/history to get complete prompt instruction.
-        # This is used to calculate available tokens.
-        temp_prompt, temp_prompt_input = generate_prompt(
-            self.provider,
-            self.model,
-            model_options,
-            query,
-            ["sample"],
-            "sample",
-        )
-        available_tokens = token_handler.calculate_and_check_available_tokens(
-            temp_prompt.format(**temp_prompt_input),
-            model_config.context_window_size,
-            model_config.parameters.max_tokens_for_response,
-        )
-
-        if vector_index is not None:
-            retriever = vector_index.as_retriever(similarity_top_k=RAG_CONTENT_LIMIT)
-            rag_chunks, available_tokens = token_handler.truncate_rag_context(
-                retriever.retrieve(query), available_tokens
+            verbose = kwargs.get("verbose", "").lower() == "true"
+            settings_string = (
+                f"conversation_id: {conversation_id}, "
+                f"query: {query}, "
+                f"provider: {self.provider}, "
+                f"model: {self.model}, "
+                f"verbose: {verbose}"
             )
-        else:
-            logger.warning("Proceeding without RAG content. Check start up messages.")
-            rag_chunks = []
+            logger.debug(f"{conversation_id} call settings: {settings_string}")
 
-        rag_context = "\n\n".join([rag_chunk.text for rag_chunk in rag_chunks])
+            token_handler = TokenHandler()
+            bare_llm = self.llm_loader(self.provider, self.model, self.generic_llm_params)
+            provider_config = config.llm_config.providers.get(self.provider)
+            model_config = provider_config.models.get(self.model)
+            model_options = self._get_model_options(provider_config)
 
-        # Truncate history, if applicable
-        history, truncated = token_handler.limit_conversation_history(
-            history, available_tokens
-        )
-
-        final_prompt, llm_input_values = generate_prompt(
-            self.provider,
-            self.model,
-            model_options,
-            query,
-            history,
-            rag_context,
-        )
-
-        # Tokens-check: We trigger the computation of the token count
-        # without care about the return value. This is to ensure that
-        # the query is within the token limit.
-        token_handler.calculate_and_check_available_tokens(
-            final_prompt.format(**llm_input_values),
-            model_config.context_window_size,
-            model_config.parameters.max_tokens_for_response,
-        )
-
-        chat_engine = LLMChain(
-            llm=bare_llm,
-            prompt=final_prompt,
-            verbose=verbose,
-        )
-
-        with TokenMetricUpdater(
-            llm=bare_llm,
-            provider=provider_config.type,
-            model=self.model,
-        ) as token_counter:
-            summary = chat_engine.invoke(
-                input=llm_input_values,
-                config={"callbacks": [token_counter]},
+            # Use sample text for context/history to get complete prompt instruction.
+            # This is used to calculate available tokens.
+            temp_prompt, temp_prompt_input = generate_prompt(
+                self.provider,
+                self.model,
+                model_options,
+                query,
+                ["sample"],
+                "sample",
+            )
+            available_tokens = token_handler.calculate_and_check_available_tokens(
+                temp_prompt.format(**temp_prompt_input),
+                model_config.context_window_size,
+                model_config.parameters.max_tokens_for_response,
             )
 
-        # retrieve text response returned from LLM, strip whitespace characters from beginning/end
-        response = summary["text"].strip()
+            if vector_index is not None:
+                retriever = vector_index.as_retriever(similarity_top_k=RAG_CONTENT_LIMIT)
+                rag_chunks, available_tokens = token_handler.truncate_rag_context(
+                    retriever.retrieve(query), available_tokens
+                )
+            else:
+                logger.warning("Proceeding without RAG content. Check start up messages.")
+                rag_chunks = []
 
-        if len(rag_context) == 0:
-            logger.debug("Using llm to answer the query without reference content")
-        logger.debug(f"{conversation_id} Summary response: {response}")
+            rag_context = "\n\n".join([rag_chunk.text for rag_chunk in rag_chunks])
 
-        return SummarizerResponse(response, rag_chunks, truncated)
+            # Truncate history, if applicable
+            history, truncated = token_handler.limit_conversation_history(
+                history, available_tokens
+            )
+
+            final_prompt, llm_input_values = generate_prompt(
+                self.provider,
+                self.model,
+                model_options,
+                query,
+                history,
+                rag_context,
+            )
+
+            # Tokens-check: We trigger the computation of the token count
+            # without care about the return value. This is to ensure that
+            # the query is within the token limit.
+            token_handler.calculate_and_check_available_tokens(
+                final_prompt.format(**llm_input_values),
+                model_config.context_window_size,
+                model_config.parameters.max_tokens_for_response,
+            )
+
+            chat_engine = LLMChain(
+                llm=bare_llm,
+                prompt=final_prompt,
+                verbose=verbose,
+            )
+
+            with TokenMetricUpdater(
+                llm=bare_llm,
+                provider=provider_config.type,
+                model=self.model,
+            ) as token_counter:
+                summary = chat_engine.invoke(
+                    input=llm_input_values,
+                    config={"callbacks": [token_counter]},
+                )
+
+            # retrieve text response returned from LLM, strip whitespace characters from beginning/end
+            response = summary["text"].strip()
+
+            if len(rag_context) == 0:
+                logger.debug("Using llm to answer the query without reference content")
+            logger.debug(f"{conversation_id} Summary response: {response}")
+
+            return SummarizerResponse(response, rag_chunks, truncated)
