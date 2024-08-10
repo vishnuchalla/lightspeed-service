@@ -35,6 +35,7 @@ RUN pip3.11 install --no-cache-dir --upgrade pip pdm \
     && pdm config python.use_venv false \
     && pdm sync --global --prod -p ${APP_ROOT}
 
+RUN chmod -R 777 ${APP_ROOT}
 
 COPY ols ./ols
 
@@ -44,7 +45,7 @@ COPY LICENSE /licenses/
 # Run the application
 EXPOSE 8080
 EXPOSE 8443
-CMD ["python3.11", "runner.py"]
+CMD ["python3.11", "-m", "memray", "run", "-o", "./output.bin", "runner.py"]
 
 LABEL io.k8s.display-name="OpenShift LightSpeed Service" \
       io.k8s.description="AI-powered OpenShift Assistant Service." \
